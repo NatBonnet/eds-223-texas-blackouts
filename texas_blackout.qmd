@@ -1,0 +1,144 @@
+---
+title: "2021 Texas Blackout and Income Disparity"
+author: "Nathalie Bonnet"
+date: 2025-11-08
+format: html
+execute: 
+  warning: false
+  message: false
+---
+
+## Setup Code
+
+1.  Loading necessary libraries
+
+```{r}
+#| output: false
+# Read in necessary libraries
+library(tidyverse)
+library(sf)
+library(here)
+library(tmap)
+library(patchwork)
+library(stars)
+```
+
+2.  Importing data
+
+```{r}
+#| output: false
+# Check names to pull out income and geography data from census tract
+st_layers(here("data", "ACS_2019_5YR_TRACT_48_TEXAS.gdb"))
+
+# Read income layer
+income <- read_sf(here("data", "ACS_2019_5YR_TRACT_48_TEXAS.gdb"), layer = "X19_INCOME")
+
+# Read polygon data from census
+geography <- st_read(here("data", "ACS_2019_5YR_TRACT_48_TEXAS.gdb"), layer = "ACS_2019_5YR_TRACT_48_TEXAS")
+
+# 2021-02-07 data geography 1
+pre_light1 <- stars::read_stars(here("data", "VNP46A1", "VNP46A1.A2021038.h08v05.001.2021039064328.tif"))
+
+# 2021-02-07 data geography 2
+pre_light2 <- stars::read_stars(here("data", "VNP46A1", "VNP46A1.A2021038.h08v06.001.2021039064329.tif"))
+
+# 2021-02-16 data geography 1
+post_light1 <- stars::read_stars(here("data", "VNP46A1", "VNP46A1.A2021047.h08v05.001.2021048091106.tif"))
+
+# 2021-02-16 data geography 2
+post_light2 <- stars::read_stars(here("data", "VNP46A1", "VNP46A1.A2021047.h08v06.001.2021048091105.tif"))
+
+# Read in residential data
+houses <- st_read(here("data", "gis_osm_buildings_a_free_1.gpkg", "gis_osm_buildings_a_free_1.gpkg"), query = "SELECT *
+FROM gis_osm_buildings_a_free_1
+WHERE (type IS NULL AND name IS NULL)
+OR type in ('residential', 'apartments', 'house', 'static_caravan', 'detached')")
+
+# Road data 
+roads <- st_read(here("data", "gis_osm_roads_free_1.gpkg", "gis_osm_roads_free_1.gpkg"), query = "SELECT * 
+FROM gis_osm_roads_free_1 
+WHERE fclass='motorway'")
+```
+
+
+## Combine satellite images and crop to Houston area
+
+```{r}
+# Combine all light areas from pre and post blackout dates
+feb_7_comb <- st_mosaic(pre_light1, pre_light2)
+
+feb_16_comb <- st_mosaic(post_light1, post_light2)
+
+# Crop to only Houston area where we are interested in
+# Create a bounding box apply to lights images, ensure they use the same crs
+houston_crop <- st_bbox(c(xmin = -96.5,  xmax = -94.5, ymin = 29, ymax = 30.5), crs = st_crs(4326))
+
+# Apply bbox to both stars objects
+feb7_cropped <- st_crop(feb_7_comb, y = houston_crop)
+
+feb16_cropped <- st_crop(feb_16_comb, y = houston_crop)
+
+# Check that all cordinates are actually equivalent to be added for raster
+if (all(st_bbox(feb7_cropped) == st_bbox(feb16_cropped))) {
+  print("bounding boxes are equivalent")
+} else {
+  warning("bounding boxes do not match")
+}
+```
+
+# Produce maps for change in night light intensity after storms
+
+```{r}
+# Plot to show change in night lights
+# Base map somehow looks so much better than the tmap
+plot(feb7_cropped, axes = TRUE, main = "Febuary 7 2019 night lights", cex.axis = 0.7) #key.lab = "luminescence")
+plot(feb16_cropped, axes = TRUE, main = "Febuary 16 2019 night lights", cex.axis = 0.7) #key.lab = "luminescence")
+
+```
+
+
+## Create blackout mask (isolate cells where blackouts occurred)
+
+```{r}
+# Subtract images to find the difference in luminescence 
+diff <- (feb7_cropped - feb16_cropped)
+
+# Reassign difference raster to a new object to save from errors
+blackout_mask <- (diff > 200)
+
+# Set cells where the difference is not greater than 200 to NA (these are non blacked out areas)
+blackout_mask[[1]][blackout_mask[[1]] == FALSE] <- NA
+
+# Vectorize mask
+blackout_vector <- st_as_sf(blackout_mask)
+
+# Validate boundaries
+blackout_vector <- st_make_valid(blackout_vector)
+
+# Reproject to EPSG:3083
+blackout_projected <- st_transform(blackout_vector, 3083)
+
+```
+
+# Exclude highways from the blackout mask
+
+```{r}
+# Check if the CRS is shared between blackout mask and roads data
+if (all(st_crs(blackout_projected) == st_crs(roads))) {
+  print("CRS is equal")
+} else {
+  warning("CRS is not the same")
+  print(paste("Roads CRS:", st_crs(roads)))
+}
+
+# Set CRS to be equal
+roads <- st_transform(roads, crs = st_crs(blackout_projected))
+
+# Join road data with blackout mask
+st_union(blackout_projected, roads)
+
+# Create buffer object
+
+highways_buffer <- st_buffer(dist = "200")
+```
+
