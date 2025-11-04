@@ -134,11 +134,58 @@ if (all(st_crs(blackout_projected) == st_crs(roads))) {
 # Set CRS to be equal
 roads <- st_transform(roads, crs = st_crs(blackout_projected))
 
-# Join road data with blackout mask
-st_union(blackout_projected, roads)
+# Aggregate roads data
+roads_union <- st_union(roads)
 
 # Create buffer object
+roads_buffer <- st_buffer(roads_union, 200)
 
-highways_buffer <- st_buffer(dist = "200")
+# Join road data with blackout mask
+blackout_roads <- st_difference(blackout_projected, roads_buffer)
+
+houses <- st_transform(houses, crs = st_crs(blackout_roads))
+
+blackout_res <- st_intersection(houses, blackout_roads)
+
+# Map homes that lost power 
+tm_shape(blackout_res) + 
+  tm_polygons(col = "#020122") + 
+  tm_shape(roads_buffer) +
+  tm_lines(col = "#4F0147") +
+  tm_basemap("CartoDB.PositronNoLabels") +
+  tm_graticules() +
+  tm_title(text = "Houston Homes Affected by the 2019 Snow Storm Blackout")
+
+# How many homes lost power?
+power_out <- length(blackout_res$osm_id)
+```
+The number of homes that lost power as a result of the 2019 snow storm was `power_out`.
+
+# Socioeconomic analysis
+
+```{r}
+# Fix column name that needs to be joined on so it is the same in both datasets
+income <- income %>% 
+  rename(GEOID_Data = GEOID)
+
+# Join geography onto income data
+socio <- left_join(geography, income, by = "GEOID_Data")
+
+# Check that CRS of income and residence in formation is the same and transform if not
+if (all(st_crs(socio) == st_crs(blackout_res))) {
+  print("CRS matches")
+} else {
+  warning("CRS of objects do not match")
+  socio <- st_transform(socio, crs = st_crs(blackout_res))
+}
+
+socio_spatial <- st_intersection(socio, blackout_res)
+
+tm_shape(socio_spatial) +
+  tm_polygons() 
+
+socio_subset <- socio_spatial %>% 
+  select(B19013e1) 
+
 ```
 
