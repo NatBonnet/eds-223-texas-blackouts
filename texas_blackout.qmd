@@ -91,8 +91,11 @@ if (all(st_bbox(feb7_cropped) == st_bbox(feb16_cropped))) {
 ```{r}
 # Plot to show change in night lights
 # Base map somehow looks so much better than the tmap
-plot(feb7_cropped, axes = TRUE, main = "Febuary 7 2019 night lights", cex.axis = 0.7) #key.lab = "luminescence")
-plot(feb16_cropped, axes = TRUE, main = "Febuary 16 2019 night lights", cex.axis = 0.7) #key.lab = "luminescence")
+
+colfunc <- colorRampPalette(c("black", "white"))
+
+plot(feb7_cropped, axes = TRUE, main = "Febuary 7 2019 night lights", cex.axis = 0.7, col = colfunc(1000), ) #key.lab = "luminescence")
+plot(feb16_cropped, axes = TRUE, main = "Febuary 16 2019 night lights", cex.axis = 0.7, col = colfunc(1000)) #key.lab = "luminescence")
 
 ```
 
@@ -124,7 +127,7 @@ blackout_projected <- st_transform(blackout_vector, 3083)
 
 ```{r}
 # Check if the CRS is shared between blackout mask and roads data
-if (all(st_crs(blackout_projected) == st_crs(roads))) {
+if (st_crs(blackout_projected) == st_crs(roads)) {
   print("CRS is equal")
 } else {
   warning("CRS is not the same")
@@ -149,9 +152,9 @@ blackout_res <- st_intersection(houses, blackout_roads)
 
 # Map homes that lost power 
 tm_shape(blackout_res) + 
-  tm_polygons(col = "#020122") + 
+  tm_polygons() + 
   tm_shape(roads_buffer) +
-  tm_lines(col = "#4F0147") +
+  tm_lines(col = "lightblue") +
   tm_basemap("CartoDB.PositronNoLabels") +
   tm_graticules() +
   tm_title(text = "Houston Homes Affected by the 2019 Snow Storm Blackout")
@@ -179,13 +182,23 @@ if (all(st_crs(socio) == st_crs(blackout_res))) {
   socio <- st_transform(socio, crs = st_crs(blackout_res))
 }
 
-socio_spatial <- st_intersection(socio, blackout_res)
+blackout_res_union <- st_union(blackout_res)
 
-tm_shape(socio_spatial) +
-  tm_polygons() 
+socio_spatial <- st_filter(socio, blackout_res_union)
+
+unique(socio_spatial$COUNTYFP)
 
 socio_subset <- socio_spatial %>% 
-  select(B19013e1) 
+  select(B19013e1, COUNTYFP, TRACTCE)
+
+tm_shape(socio_subset) +
+  tm_polygons(fill = "lightblue") +
+  tm_basemap("CartoDB.PositronNoLabels") +
+  tm_graticules() +
+  tm_title(text = "Census Tracts Affected by the 2019 Snow Storm Blackout")
+
+```
+```{r}
 
 ```
 
