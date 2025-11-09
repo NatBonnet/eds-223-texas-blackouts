@@ -94,8 +94,8 @@ if (all(st_bbox(feb7_cropped) == st_bbox(feb16_cropped))) {
 
 colfunc <- colorRampPalette(c("black", "white"))
 
-plot(feb7_cropped, axes = TRUE, main = "Febuary 7 2019 night lights", cex.axis = 0.7, col = colfunc(1000), ) #key.lab = "luminescence")
-plot(feb16_cropped, axes = TRUE, main = "Febuary 16 2019 night lights", cex.axis = 0.7, col = colfunc(1000)) #key.lab = "luminescence")
+plot(feb7_cropped, axes = TRUE, main = "Febuary 7 2021 night lights", cex.axis = 0.7, col = colfunc(1000), ) #key.lab = "luminescence")
+plot(feb16_cropped, axes = TRUE, main = "Febuary 16 2021 night lights", cex.axis = 0.7, col = colfunc(1000)) #key.lab = "luminescence")
 
 ```
 
@@ -154,15 +154,15 @@ blackout_res <- st_intersection(houses, blackout_roads)
 tm_shape(blackout_res) + 
   tm_polygons() + 
   tm_shape(roads_buffer) +
-  tm_lines(col = "lightblue") +
+  tm_lines(col = "#4668A7") +
   tm_basemap("CartoDB.PositronNoLabels") +
   tm_graticules() +
-  tm_title(text = "Houston Homes Affected by the 2019 Snow Storm Blackout")
+  tm_title(text = "Houston Homes Affected by the 2021 Snow Storm Blackout")
 
 # How many homes lost power?
 power_out <- length(blackout_res$osm_id)
 ```
-The number of homes that lost power as a result of the 2019 snow storm was `power_out`.
+The number of homes that lost power as a result of the 2021 snow storm was: `r power_out`.
 
 # Socioeconomic analysis
 
@@ -186,19 +186,58 @@ blackout_res_union <- st_union(blackout_res)
 
 socio_spatial <- st_filter(socio, blackout_res_union)
 
-unique(socio_spatial$COUNTYFP)
-
 socio_subset <- socio_spatial %>% 
   select(B19013e1, COUNTYFP, TRACTCE)
 
 tm_shape(socio_subset) +
-  tm_polygons(fill = "lightblue") +
+  tm_polygons(fill = "#93B7FC") +
   tm_basemap("CartoDB.PositronNoLabels") +
   tm_graticules() +
-  tm_title(text = "Census Tracts Affected by the 2019 Snow Storm Blackout")
+  tm_title(text = "Census Tracts Affected by the 2021 Snow Storm Blackout")
 
 ```
 ```{r}
+census_blacked <- socio_subset %>% 
+  rename("median_income" = B19013e1)
 
+census_non_blacked <- socio %>% 
+  filter(!(socio$GEOID_Data %in% socio_spatial$GEOID_Data)) %>% 
+  select(B19013e1, COUNTYFP, TRACTCE) %>% 
+  rename("median_income" = B19013e1)
+
+# Create a new column on each dataframe with whether this is a blackout or not tract
+census_blacked$blackout_status <- "blackout"
+census_non_blacked$blackout_status <- "no blackout"
+
+# Select only columns that are needed for plotting and drop geometry for easier processing
+blacked <- census_blacked %>% 
+  select(median_income, blackout_status) %>% 
+  st_drop_geometry()
+
+non_blacked <- census_non_blacked %>% 
+  select(median_income, blackout_status) %>% 
+  st_drop_geometry()
+
+# Join dataframes to plot
+median_inc_comb <- rbind(blacked, non_blacked)
+
+# Plot median income by blackout or not
+ggplot(median_inc_comb,
+       aes(x = blackout_status, 
+           y = median_income, 
+           fill = blackout_status)) +
+  geom_boxplot(width = 0.5,
+               outlier.size = 0.8,
+               alpha = 0.8) +
+  stat_summary(fun="median", geom="text", aes(label=after_stat(y)), vjust=-0.5) +
+  scale_fill_manual(values = c("#4668A7", "#9A031E")) +
+  scale_y_continuous(minor_breaks = seq(from = 0, to = 250000, by = 10000)) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(title = "Household Income in Houston Homes by Blackout Status", x = "Blackout status", y = "Income (U.S. dollars)")
 ```
+  
+  
+  
+
 
