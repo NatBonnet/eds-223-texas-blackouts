@@ -36,15 +36,6 @@ Rendered output page from texas-blackout.qmd
 
 README document
 
-## References
-
-| Data | Citation | Source |
-|-------------------|-------------------|----------------------------------|
-| EJScreen Data | United States Environmental Protection Agency. 2015. EJSCREEN. Retrieved: 10/04/2025, from url (<http://www.epa.gov/ejscreen>) | <https://www.epa.gov/ejscreen>,<https://drive.google.com/file/d/1nG6Nj1bXfzQFOVMO8Km3eNy4SWu1YcIQ/view> |
-| GBIF Archive | GBIF. (n.d.). <https://www.gbif.org/> | <https://www.gbif.org/> |
-| Ellis-Soto et al. 2023 | Ellis-Soto, D., Chapman, M. & Locke, D.H. Historical redlining is associated with increasing geographical disparities in bird biodiversity sampling in the United States. Nat Hum Behav 7, 1869–1877 (2023). <https://doi.org/10.1038/s41562-023-01688-5> | <https://www.nature.com/articles/s41562-023-01688-5#citeas> |
-| Mapping Inequality: HOLC data | *Mapping inequality*. Digital Scholarship Lab. (n.d.). <https://dsl.richmond.edu/panorama/redlining/data> | <https://dsl.richmond.edu/panorama/redlining/data> |
-
 ## Contents
 Data: Contains folders with U.S. census data, OSM, and NASA night lights
 
