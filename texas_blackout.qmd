@@ -1,7 +1,7 @@
 ---
 title: "2021 Texas Blackout and Income Disparity"
 author: "Nathalie Bonnet"
-date: 2025-11-08
+date: 2025-11-10
 format: html
 execute: 
   warning: false
@@ -60,10 +60,10 @@ FROM gis_osm_roads_free_1
 WHERE fclass='motorway'")
 ```
 
-
 ## Combine satellite images and crop to Houston area
 
 ```{r}
+#| output: false
 # Combine all light areas from pre and post blackout dates
 feb_7_comb <- st_mosaic(pre_light1, pre_light2)
 
@@ -86,19 +86,33 @@ if (all(st_bbox(feb7_cropped) == st_bbox(feb16_cropped))) {
 }
 ```
 
-# Produce maps for change in night light intensity after storms
+## Produce maps for change in night light intensity after storms
 
-```{r}
-# Plot to show change in night lights
-# Base map somehow looks so much better than the tmap
+```{r, fig.cap = "Map 1. Maps of NASA Worldview satellite imagery data from Houston before and after the 2021 snowstorm that caused statewide blackouts. The image from February 7 shows light intensity centering within the urban areas of Houston, and the image from February 16 shows a large scale blackout in these areas.", fig.width=10, fig.height=5}
+# Plot to show change in night lights between February 7 and 16
 
-colfunc <- colorRampPalette(c("black", "white"))
+feb7_map <- tm_shape(feb7_cropped) +
+tm_raster(col.scale = tm_scale_continuous(values =  "-greys"), col.legend = tm_legend(title = "Luminescence (nW cm-2sr-1)", orientation = "landscape")) +
+  tm_scalebar(position = tm_pos_in("left", "top"), 
+              text.color = "white", 
+              text.size = 0.3, 
+              color.dark = "darkgrey")+
+  tm_compass(color.dark = "darkgrey", 
+             text.color = "white") +
+  tm_title(text = "Pre Blackout (2021-02-07)")
 
-plot(feb7_cropped, axes = TRUE, main = "Febuary 7 2021 night lights", cex.axis = 0.7, col = colfunc(1000), ) #key.lab = "luminescence")
-plot(feb16_cropped, axes = TRUE, main = "Febuary 16 2021 night lights", cex.axis = 0.7, col = colfunc(1000)) #key.lab = "luminescence")
+feb16_map <- tm_shape(feb16_cropped) +
+  tm_raster(col.scale = tm_scale_continuous(values =  "-greys"), col.legend = tm_legend(title = "Luminescence (nW cm-2sr-1)", orientation = "landscape")) +
+  tm_scalebar(position = tm_pos_in("left", "top"), 
+              text.color = "white", 
+              text.size = 0.3, 
+              color.dark = "darkgrey")+
+  tm_compass(color.dark = "darkgrey", 
+             text.color = "white") +
+  tm_title(text = "Post Blackout (2021-02-16)") 
 
+tmap_arrange(feb7_map, feb16_map, outer.margins = 0.01)
 ```
-
 
 ## Create blackout mask (isolate cells where blackouts occurred)
 
@@ -123,9 +137,10 @@ blackout_projected <- st_transform(blackout_vector, 3083)
 
 ```
 
-# Exclude highways from the blackout mask
+## Exclude highways from the blackout mask
 
 ```{r}
+#| output: false
 # Check if the CRS is shared between blackout mask and roads data
 if (st_crs(blackout_projected) == st_crs(roads)) {
   print("CRS is equal")
@@ -133,7 +148,9 @@ if (st_crs(blackout_projected) == st_crs(roads)) {
   warning("CRS is not the same")
   print(paste("Roads CRS:", st_crs(roads)))
 }
+```
 
+```{r, fig.cap = "Map 2. A map of the homes in Houston, TX that were identified using a difference in light intensity from satellite imagery as having lost power during the 2021 February snowstorm. Road data is included to emphasize the density of urban areas.", fig.width=10, fig.height=9}
 # Set CRS to be equal
 roads <- st_transform(roads, crs = st_crs(blackout_projected))
 
@@ -162,12 +179,15 @@ tm_shape(blackout_res) +
 # How many homes lost power?
 power_out <- length(blackout_res$osm_id)
 ```
+
 The number of homes that lost power as a result of the 2021 snow storm was: `r power_out`.
 
-# Socioeconomic analysis
+## Socioeconomic analysis
 
-```{r}
-# Fix column name that needs to be joined on so it is the same in both datasets
+1.  Find census tracts that experienced blackouts and map over Houston area
+
+```{r, fig.cap = "Map 3. Map of the census tracts identified as being affected by the 2021 Texas blackout event.", fig.width=10, fig.height=9}
+# Fix column name that needs to be joined on so it is the same in both dataframes
 income <- income %>% 
   rename(GEOID_Data = GEOID)
 
@@ -196,10 +216,15 @@ tm_shape(socio_subset) +
   tm_title(text = "Census Tracts Affected by the 2021 Snow Storm Blackout")
 
 ```
-```{r}
+
+2.  Find the average household income for each census tract and compare by blackout status
+
+```{r, fig.cap = "Figure 1. Boxplot comparing the median household income from census tracts that were identified as being affected by the 2021 blackout or not. The tracts from homes with blackouts show a higher median houshold income that those identified as not experiencing blackouts.", fig.width=10, fig.height=9}
+# Reassign blackout census data and rename median income column
 census_blacked <- socio_subset %>% 
   rename("median_income" = B19013e1)
 
+# Filter out census ids that are in the blackout areas to find non blackout areas and filter df
 census_non_blacked <- socio %>% 
   filter(!(socio$GEOID_Data %in% socio_spatial$GEOID_Data)) %>% 
   select(B19013e1, COUNTYFP, TRACTCE) %>% 
@@ -236,8 +261,16 @@ ggplot(median_inc_comb,
   theme(legend.position = "none") +
   labs(title = "Household Income in Houston Homes by Blackout Status", x = "Blackout status", y = "Income (U.S. dollars)")
 ```
-  
-  
-  
 
+## Discussion
 
+According to the difference in light intensity identified with NASA's Worldview satellite imagery, the number of individual homes in Houston that lost power during the 2021 snow storm was about 169,000. Aggregating data about homes that experienced blackouts and those that did not by census tract, the median household income of census tracts that experienced blackout versus those that didn't was higher. From Map 1. we can see that areas that appear to have a greater difference in light intensity center in a more urban area. The perfect area of resolution to analyze the socioeconomic disparity between those affected by blackout would be at an individual level. However, the necessity of aggregating large spatial data for population level analysis may have resulted in less representative results as dense urban areas generally have many small aggregation units where suburban and rural areas have fewer larger units, which can skew results.
+
+## References
+
+| Data | Citation | Sources |
+|---------------------------|------------------|---------------------------|
+| OpenStreetMap | OpenStreetMap Contributors. (2025). OpenStreetMap database. https://planet.openstreetmap.org/| <https://planet.openstreetmap.org/> |
+| Geofabrik distribution | OpenStreetMap Data Extracts. Geofabrik Download Server. https://download.geofabrik.de/ | <https://download.geofabrik.de/> |
+| U.S. Census Data | U.S. Census Bureau. (2020). TIGER/Line Shapefiles and American Community Survey 2019 (5-Year-Estimates), Texas-Census Tract Level (ACS_2019_5YR_TRACT_48_TEXAS). U.S. Department of Commerce. https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-data.html | <https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-data.html> |
+| NASA VNP46 | Earth Science Data Systems, N. (2024, July 23). Level-1 and Atmosphere Archive and Distribution System Distributed Active Archive Center. https://www.earthdata.nasa.gov/centers/laads-daac | <https://ladsweb.modaps.eosdis.nasa.gov/> |
